@@ -1,0 +1,3 @@
+: foreach *.moon |> moonc -o %B.lua %f |> %B.lua
+: foreach *.mtask |> moonc -o %B.ltask %f |> %B.ltask
+: ltask.lua |> cat ltask.shebang ltask.lua > ltask; chmod u+x ltask |> ltask
