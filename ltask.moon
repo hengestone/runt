@@ -10,14 +10,13 @@ serpent = require "serpent"
 logging = require "logging"
 require "logging.console"
 
-
 taskmodules = {}
 class TaskRunner
   new: (arglist) =>
     @taskmods = {}
     @depsdone = {}
     @paths = {"./", "ltask"}
-    @logger = logging.new((logger, "DEBUG", msg) -> print(msg))
+    @logger = logging.new((obj, level, msg) -> print(msg))
     @spec = arglist[1]
     @logger\debug(@spec)
     @args = {}

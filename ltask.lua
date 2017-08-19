@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 local cfg = require("luarocks.cfg")
 cfg.init_package_paths()
 local os = require("os")
