@@ -2,48 +2,81 @@
 -- set up paths
 cfg = require "luarocks.cfg"
 cfg.init_package_paths()
-
 os = require "os"
-serpent = require "serpent"
 
 -- logging module
 logging = require "logging"
-require "logging.console"
+inspect = require "inspect"
+
+-- command line arguments parser
+cli = require 'cliargs'
+
+appender = (obj, level, msg) ->
+  io.write("#{level} #{string.rep(' ', 5 - #level)}")
+  io.write("#{msg}\n")
 
 taskmodules = {}
 class TaskRunner
-  new: (arglist) =>
+  new: () =>
     @taskmods = {}
     @depsdone = {}
-    @paths = {"./", "ltask"}
-    @logger = logging.new((obj, level, msg) -> print(msg))
-    @spec = arglist[1]
-    @logger\debug(@spec)
-    @args = {}
-    for i, v in pairs(arglist)
-      if i > 1
-        table.insert(@args, v)
+    @taskpaths = {"./", "ltask"}
+    @configpaths = {"./", "config"}
+    @logger = logging.new(appender)
+    @logger.level = nil
+    @cmdline, msg = @_parse_args()
+    if not @cmdline and msg
+      print msg
+    else
+      -- Set log level
+      if @cmdline.debug
+        @logger\setLevel("DEBUG")
+      else
+        @logger\setLevel(@cmdline.loglevel or "WARN")
+      @logger\debug("Command line: #{inspect(@cmdline, {newline: " ", indent: ""})}")
 
+      -- set task search dir
+      if @cmdline.libdir
+        table.insert(@taskpaths, 1, @cmdline.libdir)
+      @logger\debug("Task search path: #{inspect(@taskpaths)}")
+
+      -- set config search dir
+      if @cmdline.configdir
+        table.insert(@configpaths, 1, @cmdline.configdir)
+      @logger\debug("Config search path: #{inspect(@configpaths)}")
+      @spec = @cmdline.SPEC
+      @logger\info("Task spec: #{@spec}")
+      @args = @cmdline.ARGS
 
   start: () =>
-    @dotask(@spec)
+    @dotask(@spec, @args)
 
-  dotask: (spec) =>
+  _parse_args: () =>
+    cli\argument("SPEC", "task spec", nil)
+    cli\splat("ARGS", "task arguments", nil, 10)
+    cli\option("-f, --file=FILE", "ltask file")
+    cli\option("-c, --configdir=DIR", "path to search for config files")
+    cli\option("-l, --libdir=DIR", "path to search for .ltask files")
+    cli\option("-v, --loglevel=LEVEL", "log level, DEBUG, INFO, WARN, ERROR, FATAL")
+    cli\flag("-h, --help", "print help text", false)
+    cli\flag("-d, --debug", "set loglevel to DEBUG", false)
+    cli\parse()
+
+  dotask: (spec, args) =>
     -- determine module and task name
-    @logger\debug(serpent.serialize(spec))
-    mod, task = string.match(spec, "(%w.*):?(.*)")
+    mod, sep, task = string.match(spec, "(%w.*)(:?)(.*)")
 
     -- default task name fallback
     if not task or #task == 0
       task = "default"
-
+    @logger\info("Processing spec: #{mod}:#{task}")
     -- load code from file or cache
     module = {}
     if not @taskmods[mod] or not @taskmods[mod][task]
       fname = @_findfile(mod)
 
       if fname
-        module = dofile(mod .. ".ltask")
+        module = dofile(fname)
 
       if not module or not module
         return nil, "unknown task module #{mod}"
@@ -55,7 +88,9 @@ class TaskRunner
     taskspec = module[task]
 
     if not taskspec
-      return nil, "unknown task spec #{mod}:#{task}"
+      errmsg = "unknown task spec #{mod}:#{task}"
+      @logger\error(errmsg)
+      return nil, errmsg
 
     deps = module.depends or {} -- table of "module:task" strings
 
@@ -66,25 +101,28 @@ class TaskRunner
         continue
 
       done, err = @dotask(dspec, {})
-      @depsdone.insert([depmod .. sep .. deptask]: {done: done, err: err})
+      table.insert(@depsdone, [depmod .. sep .. deptask]: {done: done, err: err})
       if err
         return nil, err
 
     if taskspec.done != nil and ((type(taskspec.done) == "function" and taskspec.done(specs)) or taskspec.done)
       return true, nil
     else
-      return taskspec.task(specs, self)
+      done, err = taskspec.task(spec, args, self)
+      table.insert(@depsdone, [mod .. ":" .. task]: {done: done, err: err})
+      return done, err
 
   _findfile: (name) =>
-    for i, dir in ipairs(@paths)
-      fname = dir .. name .. ".ltask"
-      @logger\debug("trying file #{fname}")
-      f, err = io.open(dir .. name .. ".ltask")
+    for i, dir in ipairs(@taskpaths)
+      fname = (dir .. "/" .. name .. ".ltask")\gsub("//", "/")
+      @logger\debug("Trying file #{fname}")
+      f, err = io.open(fname, "r")
       if f
-        f:close()
+        f\close()
         return fname
     nil
 
 
-tasker = TaskRunner(arg)
-tasker\start()
+tasker = TaskRunner()
+if tasker.cmdline
+  tasker\start()

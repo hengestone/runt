@@ -14,14 +14,15 @@ description = {
 }
 
 dependencies = {
-  "lua ~> 5.1"
+  "lua ~> 5.1",
+  "luarocks ~> 2.4.2",
+  "lualogging ~> 1.3.0",
+  "lua_cliargs ~> 3.0",
+  "inspect ~> 3.1.0"
 }
 
 build = {
-  type = "builtin",
-  modules = {
-    ["ltask"] = "ltask.lua",
-  },
+  type = "none",
   install = {
     bin = {
       ["ltask"] = "ltask",
