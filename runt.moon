@@ -1,4 +1,4 @@
--- ltask
+-- runt
 -- set up paths
 cfg = require "luarocks.cfg"
 cfg.init_package_paths()
@@ -9,24 +9,32 @@ logging = require "logging"
 inspect = require "inspect"
 
 -- command line arguments parser
-cli = require 'cliargs'
+cli = require "cliargs"
+cliconfig = require "cliargs.config_loader"
 
 appender = (obj, level, msg) ->
   io.write("#{level} #{string.rep(' ', 5 - #level)}")
   io.write("#{msg}\n")
 
-taskmodules = {}
 class TaskRunner
-  new: () =>
-    @taskmods = {}
-    @depsdone = {}
-    @taskpaths = {"./", "ltask"}
+  new: (islib) =>
+    @tasks = {} -- task cache
+    @config = {}   -- config table cache
+    @depsdone = {} -- track dependencies
+
+    @taskpaths = {"./", "runt"}
     @configpaths = {"./", "config"}
+    @_setup_config()
+
+    -- set up logger
     @logger = logging.new(appender)
     @logger.level = nil
+
+    -- parse command line
     @cmdline, msg = @_parse_args()
     if not @cmdline and msg
-      print msg
+      if not islib
+        print msg
     else
       -- Set log level
       if @cmdline.debug
@@ -44,6 +52,7 @@ class TaskRunner
       if @cmdline.configdir
         table.insert(@configpaths, 1, @cmdline.configdir)
       @logger\debug("Config search path: #{inspect(@configpaths)}")
+
       @spec = @cmdline.SPEC
       @logger\info("Task spec: #{@spec}")
       @args = @cmdline.ARGS
@@ -72,17 +81,17 @@ class TaskRunner
     @logger\info("Processing spec: #{mod}:#{task}")
     -- load code from file or cache
     module = {}
-    if not @taskmods[mod] or not @taskmods[mod][task]
-      fname = @_findfile(mod)
+    if not @tasks[mod] or not @tasks[mod][task]
+      fname = @_findfile(mod, @taskpaths, {"runt","lua"})
 
       if fname
         module = dofile(fname)
 
       if not module or not module
         return nil, "unknown task module #{mod}"
-      @taskmods[mod] = module
+      @tasks[mod] = module
     else
-      module = @taskmods[mod]
+      module = @tasks[mod]
 
     -- get task spec
     taskspec = module[task]
@@ -112,17 +121,37 @@ class TaskRunner
       table.insert(@depsdone, [mod .. ":" .. task]: {done: done, err: err})
       return done, err
 
-  _findfile: (name) =>
-    for i, dir in ipairs(@taskpaths)
-      fname = (dir .. "/" .. name .. ".ltask")\gsub("//", "/")
-      @logger\debug("Trying file #{fname}")
-      f, err = io.open(fname, "r")
-      if f
-        f\close()
-        return fname
+  _config_lookup: (configtable, name) ->
+    value = rawget(configtable, name)
+    if value
+      return value
+
+    _parent = configtable._parent
+    _parent.logger\debug("_config_lookup: #{name}")
+    fname = _parent\_findfile(name, _parent.configpaths, _parent.config_exts)
+    if fname
+      ext = string.match(fname, ".*%.(%w+)")
+      return cliconfig["from_"..ext](fname)
     nil
 
+  _setup_config: () =>
+    @config._parent = self
+    @config_exts = {}
+    for ext, method in pairs(cliconfig.FORMAT_LOADERS)
+      table.insert(@config_exts, ext)
+    table.sort(@config_exts)
+    setmetatable(@config, {__index: @_config_lookup})
 
-tasker = TaskRunner()
-if tasker.cmdline
-  tasker\start()
+
+  _findfile: (name, paths, exts) =>
+    @logger\debug("_findfile:\npaths: #{inspect(paths, {newline: " ", indent: ""})}\nexts : #{inspect(exts, {newline: " ", indent: ""})}")
+    for i, dir in ipairs(paths)
+      for j, ext in ipairs(exts)
+        fname = (dir .. "/" .. name .. "." .. ext)\gsub("//", "/")
+        f, err = io.open(fname, "r")
+        if f
+          @logger\info("Found file #{fname}")
+          f\close()
+          return fname
+    @logger\debug("_findfile returning nil")
+    nil

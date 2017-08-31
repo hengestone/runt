@@ -1,0 +1,5 @@
+#!/usr/bin/env lua
+
+TaskRunner = require "runt"
+runt = TaskRunner()
+runt:start()

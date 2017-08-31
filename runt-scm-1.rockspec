@@ -1,8 +1,8 @@
-package = "ltask"
+package = "runt"
 version = "scm-1"
 
 source = {
-  url = "git://github.com/hengestone/ltask.git",
+  url = "git://github.com/hengestone/runt.git",
   branch = "master"
 }
 
@@ -25,7 +25,7 @@ build = {
   type = "none",
   install = {
     bin = {
-      ["ltask"] = "ltask",
+      ["runt"] = "runt",
     }
   }
 }

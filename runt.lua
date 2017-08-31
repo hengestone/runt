@@ -3,13 +3,13 @@ cfg.init_package_paths()
 local os = require("os")
 local logging = require("logging")
 local inspect = require("inspect")
-local cli = require('cliargs')
+local cli = require("cliargs")
+local cliconfig = require("cliargs.config_loader")
 local appender
 appender = function(obj, level, msg)
   io.write(tostring(level) .. " " .. tostring(string.rep(' ', 5 - #level)))
   return io.write(tostring(msg) .. "\n")
 end
-local taskmodules = { }
 local TaskRunner
 do
   local _class_0
@@ -35,17 +35,20 @@ do
       end
       self.logger:info("Processing spec: " .. tostring(mod) .. ":" .. tostring(task))
       local module = { }
-      if not self.taskmods[mod] or not self.taskmods[mod][task] then
-        local fname = self:_findfile(mod)
+      if not self.tasks[mod] or not self.tasks[mod][task] then
+        local fname = self:_findfile(mod, self.taskpaths, {
+          "runt",
+          "lua"
+        })
         if fname then
           module = dofile(fname)
         end
         if not module or not module then
           return nil, "unknown task module " .. tostring(mod)
         end
-        self.taskmods[mod] = module
+        self.tasks[mod] = module
       else
-        module = self.taskmods[mod]
+        module = self.tasks[mod]
       end
       local taskspec = module[task]
       if not taskspec then
@@ -93,38 +96,77 @@ do
         return done, err
       end
     end,
-    _findfile = function(self, name)
-      for i, dir in ipairs(self.taskpaths) do
-        local fname = (dir .. "/" .. name .. ".ltask"):gsub("//", "/")
-        self.logger:debug("Trying file " .. tostring(fname))
-        local f, err = io.open(fname, "r")
-        if f then
-          f:close()
-          return fname
+    _config_lookup = function(configtable, name)
+      local value = rawget(configtable, name)
+      if value then
+        return value
+      end
+      local _parent = configtable._parent
+      _parent.logger:debug("_config_lookup: " .. tostring(name))
+      local fname = _parent:_findfile(name, _parent.configpaths, _parent.config_exts)
+      if fname then
+        local ext = string.match(fname, ".*%.(%w+)")
+        return cliconfig["from_" .. ext](fname)
+      end
+      return nil
+    end,
+    _setup_config = function(self)
+      self.config._parent = self
+      self.config_exts = { }
+      for ext, method in pairs(cliconfig.FORMAT_LOADERS) do
+        table.insert(self.config_exts, ext)
+      end
+      table.sort(self.config_exts)
+      return setmetatable(self.config, {
+        __index = self._config_lookup
+      })
+    end,
+    _findfile = function(self, name, paths, exts)
+      self.logger:debug("_findfile:\npaths: " .. tostring(inspect(paths, {
+        newline = " ",
+        indent = ""
+      })) .. "\nexts : " .. tostring(inspect(exts, {
+        newline = " ",
+        indent = ""
+      })))
+      for i, dir in ipairs(paths) do
+        for j, ext in ipairs(exts) do
+          local fname = (dir .. "/" .. name .. "." .. ext):gsub("//", "/")
+          local f, err = io.open(fname, "r")
+          if f then
+            self.logger:info("Found file " .. tostring(fname))
+            f:close()
+            return fname
+          end
         end
       end
+      self.logger:debug("_findfile returning nil")
       return nil
     end
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
-    __init = function(self)
-      self.taskmods = { }
+    __init = function(self, islib)
+      self.tasks = { }
+      self.config = { }
       self.depsdone = { }
       self.taskpaths = {
         "./",
-        "ltask"
+        "runt"
       }
       self.configpaths = {
         "./",
         "config"
       }
+      self:_setup_config()
       self.logger = logging.new(appender)
       self.logger.level = nil
       local msg
       self.cmdline, msg = self:_parse_args()
       if not self.cmdline and msg then
-        return print(msg)
+        if not islib then
+          return print(msg)
+        end
       else
         if self.cmdline.debug then
           self.logger:setLevel("DEBUG")
@@ -160,8 +202,5 @@ do
   })
   _base_0.__class = _class_0
   TaskRunner = _class_0
-end
-local tasker = TaskRunner()
-if tasker.cmdline then
-  return tasker:start()
+  return _class_0
 end
