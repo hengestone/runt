@@ -1,2 +1,2 @@
-# ltask
+# runt
 Lua task runner
