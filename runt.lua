@@ -20,7 +20,6 @@ do
     _parse_args = function(self)
       cli:argument("SPEC", "task spec", nil)
       cli:splat("ARGS", "task arguments", nil, 10)
-      cli:option("-f, --file=FILE", "ltask file")
       cli:option("-c, --configdir=DIR", "path to search for config files")
       cli:option("-l, --libdir=DIR", "path to search for .ltask files")
       cli:option("-v, --loglevel=LEVEL", "log level, DEBUG, INFO, WARN, ERROR, FATAL")
@@ -37,8 +36,7 @@ do
       local module = { }
       if not self.tasks[mod] or not self.tasks[mod][task] then
         local fname = self:_findfile(mod, self.taskpaths, {
-          "runt",
-          "lua"
+          "runt"
         })
         if fname then
           module = dofile(fname)
@@ -151,11 +149,10 @@ do
       self.config = { }
       self.depsdone = { }
       self.taskpaths = {
-        "./",
+        ".",
         "runt"
       }
       self.configpaths = {
-        "./",
         "config"
       }
       self:_setup_config()
@@ -165,7 +162,7 @@ do
       self.cmdline, msg = self:_parse_args()
       if not self.cmdline and msg then
         if not islib then
-          return print(msg)
+          return print("FATAL: " .. tostring(msg))
         end
       else
         if self.cmdline.debug then

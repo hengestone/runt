@@ -22,8 +22,8 @@ class TaskRunner
     @config = {}   -- config table cache
     @depsdone = {} -- track dependencies
 
-    @taskpaths = {"./", "runt"}
-    @configpaths = {"./", "config"}
+    @taskpaths = {".", "runt"}
+    @configpaths = {"config"}
     @_setup_config()
 
     -- set up logger
@@ -34,7 +34,7 @@ class TaskRunner
     @cmdline, msg = @_parse_args()
     if not @cmdline and msg
       if not islib
-        print msg
+        print("FATAL: #{msg}")
     else
       -- Set log level
       if @cmdline.debug
@@ -63,7 +63,6 @@ class TaskRunner
   _parse_args: () =>
     cli\argument("SPEC", "task spec", nil)
     cli\splat("ARGS", "task arguments", nil, 10)
-    cli\option("-f, --file=FILE", "ltask file")
     cli\option("-c, --configdir=DIR", "path to search for config files")
     cli\option("-l, --libdir=DIR", "path to search for .ltask files")
     cli\option("-v, --loglevel=LEVEL", "log level, DEBUG, INFO, WARN, ERROR, FATAL")
@@ -82,7 +81,7 @@ class TaskRunner
     -- load code from file or cache
     module = {}
     if not @tasks[mod] or not @tasks[mod][task]
-      fname = @_findfile(mod, @taskpaths, {"runt","lua"})
+      fname = @_findfile(mod, @taskpaths, {"runt"})
 
       if fname
         module = dofile(fname)

@@ -2,4 +2,6 @@
 
 TaskRunner = require "runt"
 runt = TaskRunner()
-runt:start()
+if runt.spec then
+  runt:start()
+end
