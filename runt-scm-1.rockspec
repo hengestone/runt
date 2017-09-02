@@ -22,8 +22,14 @@ dependencies = {
 }
 
 build = {
-  type = "none",
+  type = "builtin",
+  modules = {
+    ["runt"] = "runt.lua",
+  },
   install = {
+    lua = {
+      ["runt"] = "runt.lua",
+    },
     bin = {
       ["runt"] = "runt",
     }
