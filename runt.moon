@@ -1,6 +1,10 @@
 -- runt
 -- set up paths
 cfg = require "luarocks.cfg"
+util = require "luarocks.util"
+dir = require "luarocks.dir"
+debug = require "debug"
+
 cfg.init_package_paths()
 os = require "os"
 
@@ -45,7 +49,16 @@ class TaskRunner
 
       -- set task search dir
       if @cmdline.libdir
-        table.insert(@taskpaths, 1, @cmdline.libdir)
+        libdirs_semi = util.split_string(path, ";")
+        libdirs_comma = util.split_string(path, ",")
+        libdirs = libdirs_comma
+        if #libdirs_semi > #libdirs
+          libdirs = libdirs_semi
+        for i, path in ipairs(libdirs)
+          table.insert(@taskpaths, 1, path)
+      if not @cmdline.nosystem
+        @taskpaths = @_setup_paths(@taskpaths)
+
       @logger\debug("Task search path: #{inspect(@taskpaths)}")
 
       -- set config search dir
@@ -67,12 +80,13 @@ class TaskRunner
     cli\option("-l, --libdir=DIR", "path to search for .ltask files")
     cli\option("-v, --loglevel=LEVEL", "log level, DEBUG, INFO, WARN, ERROR, FATAL")
     cli\flag("-h, --help", "print help text", false)
+    cli\flag("-n, --nosystem", "don't look for runt scripts in system paths", false)
     cli\flag("-d, --debug", "set loglevel to DEBUG", false)
     cli\parse()
 
   dotask: (spec, args) =>
     -- determine module and task name
-    mod, sep, task = string.match(spec, "(%w.*)(:?)(.*)")
+    mod, sep, task = string.match(spec, "(%w*)(:?)(.*)")
 
     -- default task name fallback
     if not task or #task == 0
@@ -154,3 +168,28 @@ class TaskRunner
           return fname
     @logger\debug("_findfile returning nil")
     nil
+
+  _setup_paths: (paths) =>
+    newpaths = {}
+    pmap = {}
+    -- Add paths from supplied argument
+    for i, path in ipairs(paths)
+      pmap[path] = true
+      table.insert(newpaths, dir.normalize(path))
+
+    -- Add current script path
+    script_path = dir.dir_name(debug.getinfo(appender).source\sub(2))
+    @logger\debug("Script path #{script_path}")
+    if not pmap[script_path]
+      table.insert(newpaths, script_path)
+      pmap[script_path] = true
+
+    -- Add package paths
+    package_paths = util.split_string(cfg.package_paths(), ";")
+    for i, path in ipairs(package_paths)
+      ppath = dir.normalize(util.split_string(path, "?")[1])
+      for i, npath in ipairs({ppath, ppath .. "/runt"})
+        if not pmap[npath]
+          pmap[npath] = true
+          table.insert(newpaths, npath)
+    newpaths

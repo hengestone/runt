@@ -1,4 +1,7 @@
 local cfg = require("luarocks.cfg")
+local util = require("luarocks.util")
+local dir = require("luarocks.dir")
+local debug = require("debug")
 cfg.init_package_paths()
 local os = require("os")
 local logging = require("logging")
@@ -24,11 +27,12 @@ do
       cli:option("-l, --libdir=DIR", "path to search for .ltask files")
       cli:option("-v, --loglevel=LEVEL", "log level, DEBUG, INFO, WARN, ERROR, FATAL")
       cli:flag("-h, --help", "print help text", false)
+      cli:flag("-n, --nosystem", "don't look for runt scripts in system paths", false)
       cli:flag("-d, --debug", "set loglevel to DEBUG", false)
       return cli:parse()
     end,
     dotask = function(self, spec, args)
-      local mod, sep, task = string.match(spec, "(%w.*)(:?)(.*)")
+      local mod, sep, task = string.match(spec, "(%w*)(:?)(.*)")
       if not task or #task == 0 then
         task = "default"
       end
@@ -140,6 +144,34 @@ do
       end
       self.logger:debug("_findfile returning nil")
       return nil
+    end,
+    _setup_paths = function(self, paths)
+      local newpaths = { }
+      local pmap = { }
+      for i, path in ipairs(paths) do
+        pmap[path] = true
+        table.insert(newpaths, dir.normalize(path))
+      end
+      local script_path = dir.dir_name(debug.getinfo(appender).source:sub(2))
+      self.logger:debug("Script path " .. tostring(script_path))
+      if not pmap[script_path] then
+        table.insert(newpaths, script_path)
+        pmap[script_path] = true
+      end
+      local package_paths = util.split_string(cfg.package_paths(), ";")
+      for i, path in ipairs(package_paths) do
+        local ppath = dir.normalize(util.split_string(path, "?")[1])
+        for i, npath in ipairs({
+          ppath,
+          ppath .. "/runt"
+        }) do
+          if not pmap[npath] then
+            pmap[npath] = true
+            table.insert(newpaths, npath)
+          end
+        end
+      end
+      return newpaths
     end
   }
   _base_0.__index = _base_0
@@ -175,7 +207,18 @@ do
           indent = ""
         })))
         if self.cmdline.libdir then
-          table.insert(self.taskpaths, 1, self.cmdline.libdir)
+          local libdirs_semi = util.split_string(path, ";")
+          local libdirs_comma = util.split_string(path, ",")
+          local libdirs = libdirs_comma
+          if #libdirs_semi > #libdirs then
+            libdirs = libdirs_semi
+          end
+          for i, path in ipairs(libdirs) do
+            table.insert(self.taskpaths, 1, path)
+          end
+        end
+        if not self.cmdline.nosystem then
+          self.taskpaths = self:_setup_paths(self.taskpaths)
         end
         self.logger:debug("Task search path: " .. tostring(inspect(self.taskpaths)))
         if self.cmdline.configdir then
