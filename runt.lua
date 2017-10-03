@@ -1,8 +1,9 @@
 local cfg = require("luarocks.cfg")
-local util = require("luarocks.util")
-local dir = require("luarocks.dir")
-local debug = require("debug")
 cfg.init_package_paths()
+local util = require("luarocks.util")
+local dir = require("path")
+local lfs = require("lfs")
+local debug = require("debug")
 local os = require("os")
 local logging = require("logging")
 local inspect = require("inspect")
@@ -44,6 +45,7 @@ do
         })
         if fname then
           module = dofile(fname)
+          self.logger:debug(inspect(module))
         end
         if not module or not module then
           return nil, "unknown task module " .. tostring(mod)
@@ -96,6 +98,21 @@ do
           }
         })
         return done, err
+      end
+    end,
+    show_module = function(self, name, module)
+      print(name)
+      for i = 1, #name do
+        io.stdout:write("-")
+      end
+      io.stdout:write("\n")
+      for task_name, task_info in pairs(module) do
+        io.stdout:write(tostring(task_name))
+        if task_info.desc then
+          print(":\t\t" .. tostring(task_info.desc))
+        else
+          print(":\t\tno description")
+        end
       end
     end,
     _config_lookup = function(configtable, name)
@@ -152,7 +169,7 @@ do
         pmap[path] = true
         table.insert(newpaths, dir.normalize(path))
       end
-      local script_path = dir.dir_name(debug.getinfo(appender).source:sub(2))
+      local script_path = dir.dirname(debug.getinfo(appender).source:sub(2))
       self.logger:debug("Script path " .. tostring(script_path))
       if not pmap[script_path] then
         table.insert(newpaths, script_path)
@@ -161,17 +178,52 @@ do
       local package_paths = util.split_string(cfg.package_paths(), ";")
       for i, path in ipairs(package_paths) do
         local ppath = dir.normalize(util.split_string(path, "?")[1])
-        for i, npath in ipairs({
-          ppath,
-          ppath .. "/runt"
-        }) do
-          if not pmap[npath] then
-            pmap[npath] = true
-            table.insert(newpaths, npath)
-          end
+        local npath = ppath .. "/runt"
+        if not pmap[npath] then
+          pmap[npath] = true
+          table.insert(newpaths, npath)
         end
       end
       return newpaths
+    end,
+    _list_files_sorted = function(self, path)
+      local ndir = dir.normalize(path)
+      local fullpath, err = dir.isdir(ndir)
+      if err or not fullpath then
+        return nil, "No such directory " .. tostring(ndir)
+      end
+      local dirs = { }
+      for fname in lfs.dir(ndir) do
+        table.insert(dirs, fname)
+      end
+      table.sort(dirs)
+      return dirs
+    end,
+    _relpath = function(self, dir, fname)
+      local fullpath = path.fullpath(fname)
+      print("fullpath = " .. tostring(fullpath))
+      local s, e = string.find(fullpath, dir, 1, true)
+      local res = string.sub(fullpath, e + 2)
+      print("res = " .. tostring(res))
+      return res
+    end,
+    list_files = function(self, path)
+      local fnames, err = self:_list_files_sorted(path)
+      if not err then
+        self.logger:debug("list_files in " .. tostring(path) .. ":\n" .. inspect(fnames))
+        local result = { }
+        for i, fname in ipairs(fnames) do
+          local name = string.match(fname, "(.*)%.runt")
+          local fullpath = dir.join(path, fname)
+          if name and dir.isfile(fullpath) then
+            result[name] = fullpath
+          end
+        end
+        return result, nil
+      else
+        self.logger:debug("list_files: " .. err)
+        return { }, err
+      end
     end
   }
   _base_0.__index = _base_0

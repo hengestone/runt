@@ -1,2 +1,2 @@
 : foreach *.moon |> moonc -o %B.lua %f |> %B.lua
-: foreach *.mtask |> moonc -o %B.ltask %f |> %B.ltask
+: foreach *.mrunt |> moonc -o %B.runt %f |> %B.runt

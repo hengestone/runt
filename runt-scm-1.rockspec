@@ -18,17 +18,21 @@ dependencies = {
   "luarocks ~> 2.4.2",
   "lualogging ~> 1.3.0",
   "lua_cliargs ~> 3.0",
-  "inspect ~> 3.1.0"
+  "inspect ~> 3.1.0",
+  "lua-path ~> 0.3",
+  "luafilesystem ~> 1.6.3"
 }
 
 build = {
   type = "builtin",
   modules = {
     ["runt"] = "runt.lua",
+    ["runt/list"] = "list.runt",
   },
   install = {
     lua = {
       ["runt"] = "runt.lua",
+      ["runt/list"] = "list.runt",
     },
     bin = {
       ["runt"] = "runt",

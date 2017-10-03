@@ -1,11 +1,12 @@
 -- runt
 -- set up paths
 cfg = require "luarocks.cfg"
-util = require "luarocks.util"
-dir = require "luarocks.dir"
-debug = require "debug"
-
 cfg.init_package_paths()
+util = require "luarocks.util"
+dir = require "path"
+lfs = require "lfs"
+
+debug = require "debug"
 os = require "os"
 
 -- logging module
@@ -99,6 +100,7 @@ class TaskRunner
 
       if fname
         module = dofile(fname)
+        @logger\debug(inspect(module))
 
       if not module or not module
         return nil, "unknown task module #{mod}"
@@ -133,6 +135,18 @@ class TaskRunner
       done, err = taskspec.task(spec, args, self)
       table.insert(@depsdone, [mod .. ":" .. task]: {done: done, err: err})
       return done, err
+
+  show_module: (name, module) =>
+    print name
+    for i=1,#name do
+      io.stdout\write("-")
+    io.stdout\write("\n")
+    for task_name, task_info in pairs(module)
+      io.stdout\write("#{task_name}")
+      if task_info.desc
+        print ":\t\t#{task_info.desc}"
+      else
+        print ":\t\tno description"
 
   _config_lookup: (configtable, name) ->
     value = rawget(configtable, name)
@@ -178,7 +192,7 @@ class TaskRunner
       table.insert(newpaths, dir.normalize(path))
 
     -- Add current script path
-    script_path = dir.dir_name(debug.getinfo(appender).source\sub(2))
+    script_path = dir.dirname(debug.getinfo(appender).source\sub(2))
     @logger\debug("Script path #{script_path}")
     if not pmap[script_path]
       table.insert(newpaths, script_path)
@@ -188,8 +202,44 @@ class TaskRunner
     package_paths = util.split_string(cfg.package_paths(), ";")
     for i, path in ipairs(package_paths)
       ppath = dir.normalize(util.split_string(path, "?")[1])
-      for i, npath in ipairs({ppath, ppath .. "/runt"})
-        if not pmap[npath]
-          pmap[npath] = true
-          table.insert(newpaths, npath)
+      npath = ppath .. "/runt"
+      if not pmap[npath]
+        pmap[npath] = true
+        table.insert(newpaths, npath)
     newpaths
+
+  _list_files_sorted: (path) =>
+    ndir = dir.normalize(path)
+    fullpath, err = dir.isdir(ndir)
+    if err or not fullpath
+      return nil, "No such directory #{ndir}"
+
+    dirs = {}
+    for fname in lfs.dir(ndir)
+      table.insert(dirs, fname)
+    table.sort(dirs)
+    dirs
+
+  _relpath: (dir, fname) =>
+    fullpath = path.fullpath(fname)
+    print("fullpath = #{fullpath}")
+    s, e = string.find(fullpath, dir, 1, true)
+    res = string.sub(fullpath, e+2)
+    print("res = #{res}")
+    res
+
+  list_files: (path) =>
+    fnames, err = @_list_files_sorted(path)
+    if not err
+      @logger\debug("list_files in #{path}:\n" .. inspect(fnames))
+      result = {}
+      for i, fname in ipairs(fnames)
+        name = string.match(fname, "(.*)%.runt")
+        fullpath = dir.join(path, fname)
+        if name and dir.isfile(fullpath)
+          result[name] = fullpath
+      result, nil
+    else
+      @logger\debug("list_files: " .. err)
+      {}, err
+

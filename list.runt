@@ -1,0 +1,21 @@
+local inspect = require("inspect")
+local tasks = {
+  default = {
+    depends = nil,
+    desc = "List all available modules and commands",
+    task = function(spec, args, runt)
+      for i, path in ipairs(runt.taskpaths) do
+        local files = runt:list_files(path)
+        for name, fname in pairs(files) do
+          runt.logger:debug("Loading " .. tostring(fname))
+          local module, err = dofile(fname)
+          if not err then
+            runt:show_module(name, module)
+          end
+        end
+      end
+    end,
+    done = nil
+  }
+}
+return tasks
