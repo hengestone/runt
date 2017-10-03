@@ -8,7 +8,7 @@ source = {
 
 description = {
   summary = "Task runner in Lua",
-  homepage = "https://github.com/hengestone/ltask",
+  homepage = "https://github.com/hengestone/runt",
   maintainer = "Conrad Steenberg <conrad.steenberg@gmail.com>",
   license = "MPLv2"
 }
