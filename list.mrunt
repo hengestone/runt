@@ -12,4 +12,24 @@ tasks =
           if not err
             runt\show_module(name, module)
     done: nil
+  paths:
+    depends: nil
+    desc: "List module search paths"
+    task: (spec, args, runt) ->
+      for i, path in ipairs(runt.taskpaths)
+        print path
+    done: nil
+  modules:
+    depends: nil
+    desc: "List modules"
+    task: (spec, args, runt) ->
+      for i, path in ipairs(runt.taskpaths)
+        files = runt\list_files(path)
+        for name, fname in pairs(files)
+          runt.logger\debug("Loading #{fname}")
+          module, err = dofile(fname)
+          if not err
+            print name
+    done: nil
+
 tasks

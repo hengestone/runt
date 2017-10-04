@@ -16,6 +16,33 @@ local tasks = {
       end
     end,
     done = nil
+  },
+  paths = {
+    depends = nil,
+    desc = "List module search paths",
+    task = function(spec, args, runt)
+      for i, path in ipairs(runt.taskpaths) do
+        print(path)
+      end
+    end,
+    done = nil
+  },
+  modules = {
+    depends = nil,
+    desc = "List modules",
+    task = function(spec, args, runt)
+      for i, path in ipairs(runt.taskpaths) do
+        local files = runt:list_files(path)
+        for name, fname in pairs(files) do
+          runt.logger:debug("Loading " .. tostring(fname))
+          local module, err = dofile(fname)
+          if not err then
+            print(name)
+          end
+        end
+      end
+    end,
+    done = nil
   }
 }
 return tasks
