@@ -1,2 +1,3 @@
 : foreach *.moon |> moonc -o %B.lua %f |> %B.lua
 : foreach *.mrunt |> moonc -o %B.runt %f |> %B.runt
+: foreach runtlib/*.mrunt |> moonc -o runtlib/%B.runt %f |> runtlib/%B.runt
