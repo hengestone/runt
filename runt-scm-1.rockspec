@@ -27,12 +27,11 @@ build = {
   type = "builtin",
   modules = {
     ["runt"] = "runt.lua",
-    ["runt/list"] = "list.runt",
   },
   install = {
     lua = {
       ["runt"] = "runt.lua",
-      ["runt/list"] = "list.runt",
+      ["runt.list"] = "runtlib/list.runt",
     },
     bin = {
       ["runt"] = "runt",
