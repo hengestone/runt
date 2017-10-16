@@ -50,4 +50,4 @@ Module files should have the extension `.runt`. The arguments to the `task` key 
 
 E.g. a command line of ```runt list:paths onlycurrent```
 
-would result in the path function called as ``task("list:paths", {"onlycurrent"}, <runt object>)```
+would result in the path function called as ```task("list:paths", {"onlycurrent"}, <runt object>)```
