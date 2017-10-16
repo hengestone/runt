@@ -143,10 +143,12 @@ class TaskRunner
     io.stdout\write("\n")
     for task_name, task_info in pairs(module)
       io.stdout\write("#{task_name}")
+      for i=1,16 - #task_name do
+        io.stdout\write(" ")
       if task_info.desc
-        print ":\t\t#{task_info.desc}"
+        print "#{task_info.desc}"
       else
-        print ":\t\tno description"
+        print "no description"
 
   _config_lookup: (configtable, name) ->
     value = rawget(configtable, name)

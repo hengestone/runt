@@ -1,15 +1,19 @@
-inspect = require "inspect"
 tasks =
   default:
     depends: nil
     desc: "List all available modules and commands"
     task: (spec, args, runt) ->
+      first = true
       for i, path in ipairs(runt.taskpaths)
         files = runt\list_files(path)
         for name, fname in pairs(files)
           runt.logger\debug("Loading #{fname}")
           module, err = dofile(fname)
           if not err
+            if not first
+              io.stdout\write("\n")
+            else
+              first = false
             runt\show_module(name, module)
     done: nil
   paths:

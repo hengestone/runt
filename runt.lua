@@ -108,10 +108,13 @@ do
       io.stdout:write("\n")
       for task_name, task_info in pairs(module) do
         io.stdout:write(tostring(task_name))
+        for i = 1, 16 - #task_name do
+          io.stdout:write(" ")
+        end
         if task_info.desc then
-          print(":\t\t" .. tostring(task_info.desc))
+          print(tostring(task_info.desc))
         else
-          print(":\t\tno description")
+          print("no description")
         end
       end
     end,
